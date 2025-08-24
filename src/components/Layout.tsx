@@ -1,6 +1,7 @@
 import { useLaunchParams } from '@telegram-apps/sdk-react';
 import { type FC, type PropsWithChildren, useState } from 'react';
 import Settings from './Settings';
+import { BACKEND_URL } from '@/lib/utils/constants';
 
 const Layout: FC<PropsWithChildren<{}>> = ({ children }) => {
     const lp = useLaunchParams(true);
@@ -8,7 +9,7 @@ const Layout: FC<PropsWithChildren<{}>> = ({ children }) => {
 
     const handleRefresh = async () => {
         try {
-            await fetch('http://localhost:4000/restart', { method: 'POST' });
+            await fetch(`${BACKEND_URL}/restart`, { method: 'POST' });
         } catch (error) {
             console.error('Failed to restart server', error);
         } finally {

@@ -1,6 +1,7 @@
 import { type FC, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import type { PumpNewTokenResponse } from '../types/services';
+import { BACKEND_URL } from '@/lib/utils/constants';
 
 interface SettingsFormData {
     minMarketCap: number;
@@ -24,7 +25,7 @@ const Settings: FC<SettingsProps> = ({ isOpen, onClose }) => {
         // Fetch current settings when component opens
         // For now, using default values as API for GET is not defined
         const getSettings = async () => {
-            const settings = await fetch('http://localhost:4000/tokens/filter');
+            const settings = await fetch(`${BACKEND_URL}/tokens/filter`);
             const data = (await settings.json()) as PumpNewTokenResponse['config'];
             reset({
                 minMarketCap: data.minMarketCap,
@@ -41,7 +42,7 @@ const Settings: FC<SettingsProps> = ({ isOpen, onClose }) => {
 
     const onSubmit = async (data: SettingsFormData) => {
         try {
-            await fetch('http://localhost:4000/tokens/filter', {
+            await fetch(`${BACKEND_URL}/tokens/filter`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

@@ -4,6 +4,7 @@ import type { Token } from '@/types/token';
 import { Metric, MetricChange } from './ui/Metric';
 import { useFavorites } from '@/hooks/useFavorites';
 import { formatTime, solToUsd, formatPercentage } from '@/lib/utils/format';
+import { BACKEND_URL } from '@/lib/utils/constants';
 
 export default function TokenCard({ t }: { t: Token }) {
     const [copied, setCopied] = useState(false);
@@ -34,7 +35,7 @@ export default function TokenCard({ t }: { t: Token }) {
 
     const handleDelete = async () => {
         try {
-            const response = await fetch(`http://localhost:4000/tokens/${t.mint}`, {
+            const response = await fetch(`${BACKEND_URL}/tokens/${t.mint}`, {
                 method: 'DELETE',
             });
             if (!response.ok) {

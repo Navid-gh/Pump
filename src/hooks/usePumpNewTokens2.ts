@@ -3,6 +3,7 @@ import type { PumpNewTokenResponse } from '@/types/services';
 import { ipfsToHttp, LRU } from '@/lib/utils/ipfs';
 import { fetchJsonWithFallback } from '@/lib/utils';
 import type { Token } from '@/types/token';
+import { BACKEND_URL } from '@/lib/utils/constants';
 
 const metaCache = new LRU<string, any>(300);
 
@@ -15,7 +16,7 @@ export function usePumpNewTokens() {
     });
 
     useEffect(() => {
-        const backUrl = 'http://localhost:4000/tokens';
+        const backUrl = `${BACKEND_URL}/tokens`;
 
         const interval = setInterval(async () => {
             fetch(backUrl)
