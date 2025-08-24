@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        color-scheme: light dark;
+        --tg-theme-bg-color: #0f1115;
+        --tg-theme-text-color: #fff;
+    }
+
+    body {
+        @apply m-0 flex min-h-screen min-w-[320px] place-items-center;
+        background: var(--tg-theme-bg-color);
+        color: var(--tg-theme-text-color);
+    }
+
+    #root {
+        @apply min-h-screen min-w-[320px] flex flex-col w-full;
+    }
+}
