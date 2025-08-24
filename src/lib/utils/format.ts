@@ -13,10 +13,20 @@ export function formatNumber(num: number, precision: number = 2): string {
 }
 
 export function formatTime(seconds: number): string {
-    if (seconds < 60) return `${seconds.toFixed(0)}s`;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.round(seconds % 60);
-    return `${minutes}m ${remainingSeconds}s`;
+    if (isNaN(seconds) || seconds < 0) return '0s';
+
+    const days = Math.floor(seconds / 86400);
+    const hrs = Math.floor((seconds % 86400) / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    let result = '';
+    if (days > 0) result += `${days}d `;
+    if (hrs > 0) result += `${hrs}h `;
+    if (mins > 0 || hrs > 0) result += `${mins}m `;
+    result += `${secs}s`;
+
+    return result.trim();
 }
 
 export function formatPercentage(numerator: number, denominator: number): string {

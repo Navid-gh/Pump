@@ -33,10 +33,6 @@ export default function TokenCard({ t }: { t: Token }) {
     };
 
     const handleDelete = async () => {
-        if (!confirm(`Are you sure you want to delete token ${t.name} (${t.symbol})?`)) {
-            return;
-        }
-
         try {
             const response = await fetch(`http://localhost:4000/tokens/${t.mint}`, {
                 method: 'DELETE',
@@ -69,6 +65,15 @@ export default function TokenCard({ t }: { t: Token }) {
                 <div className='min-w-0'>
                     <Link to={`/token/${t.mint}`} className='text-sm font-semibold truncate hover:underline flex items-center gap-1'>
                         {t?.name}
+                        {t?.timestamp && (
+                            <span className='text-xs text-white/60'> (Created: {formatTime((Date.now() - t?.timestamp) / 1000)})</span>
+                        )}
+                        {t.entryPoint && (
+                            <span className='text-xs text-white/60'>
+                                {' '}
+                                (Entered: {formatTime((Date.now() - t?.entryPoint?.timestamp) / 1000)})
+                            </span>
+                        )}
                         {<span className='text-xs text-white/60'>Updated: {formatTime(timeSinceLastTrade)}</span>}
                     </Link>
                     <div className='text-xs text-white/60 truncate'>${t?.symbol}</div>

@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import { FixedSizeList as List } from 'react-window';
 import TokenCard from '@/components/TokenCard';
 import { usePumpNewTokens } from '@/hooks/usePumpNewTokens2';
 import { useFavorites } from '@/hooks/useFavorites';
 import type { Token } from '@/types/token';
+
+const ITEM_HEIGHT = 420; // Approximate height of TokenCard
+const WINDOW_HEIGHT = 600; // Height of the virtual list window
 
 type Tab = 'new' | 'entered' | 'favorites';
 
@@ -11,24 +15,58 @@ export default function Dashboard() {
     const { tokens, enteredTokens } = usePumpNewTokens();
     const { favorites } = useFavorites();
 
-    const favoriteTokens = [...tokens, ...enteredTokens].filter((t) => favorites.has(t.mint));
-    const uniqueFavoriteTokens = Array.from(new Map(favoriteTokens.map((item) => [item.mint, item])).values());
+    // Memoize the favorite tokens calculation
+    const favoriteTokens = useMemo(() => {
+        const allTokens = [...tokens, ...enteredTokens];
+        const filtered = allTokens.filter((t) => favorites.has(t.mint));
+        return Array.from(new Map(filtered.map((item) => [item.mint, item])).values());
+    }, [tokens, enteredTokens, favorites]);
 
-    const getTokensToShow = (): Token[] => {
+    // Memoize the tokens to show based on active tab
+    const tokensToShow = useMemo(() => {
+        let result: Token[] = [];
         switch (activeTab) {
             case 'new':
-                return tokens;
+                result = tokens;
+                break;
             case 'entered':
-                return enteredTokens;
+                result = enteredTokens;
+                break;
             case 'favorites':
-                return uniqueFavoriteTokens;
-            default:
-                return [];
+                result = favoriteTokens;
+                break;
         }
-    };
+        // Sort by last trade time (most recent first)
+        return result.sort((a, b) => b.lastTradeTime - a.lastTradeTime);
+    }, [activeTab, tokens, enteredTokens, favoriteTokens]);
 
-    const tokensToShow = getTokensToShow();
-    const handleTabClick = (tab: Tab) => setActiveTab(tab);
+    // Memoize the tab click handler
+    const handleTabClick = useCallback((tab: Tab) => {
+        setActiveTab(tab);
+    }, []);
+
+    // Memoize the row renderer for the virtual list
+    const Row = useCallback(
+        ({ index, style }: { index: number; style: React.CSSProperties }) => {
+            const token = tokensToShow[index];
+            if (!token) return null;
+
+            return (
+                <div style={style}>
+                    <TokenCard key={`${token.signature}-${token.mint}`} t={token} />
+                </div>
+            );
+        },
+        [tokensToShow]
+    );
+
+    // Memoize the item data for react-window
+    const itemData = useMemo(
+        () => ({
+            tokens: tokensToShow,
+        }),
+        [tokensToShow]
+    );
 
     return (
         <div>
@@ -52,16 +90,16 @@ export default function Dashboard() {
                     className={`pb-2 text-sm transition-colors ${
                         activeTab === 'favorites' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'
                     }`}>
-                    Favorites ({uniqueFavoriteTokens.length})
+                    Favorites ({favoriteTokens.length})
                 </button>
             </div>
-            <div className='grid gap-3'>
-                {tokensToShow
-                    .sort((a, b) => b.lastTradeTime - a.lastTradeTime)
-                    .map((t) => (
-                        <TokenCard key={`${t.signature}-${t.mint}`} t={t} />
-                    ))}
-            </div>
+            {tokensToShow.length > 0 ? (
+                <List height={WINDOW_HEIGHT} itemCount={tokensToShow.length} itemSize={ITEM_HEIGHT} width='100%' itemData={itemData}>
+                    {Row}
+                </List>
+            ) : (
+                <div className='text-center text-white/50 py-8'>No tokens available in this tab.</div>
+            )}
         </div>
     );
 }

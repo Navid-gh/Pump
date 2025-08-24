@@ -1,80 +1,98 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PumpNewTokenEvent } from '@/types/services';
+import type { PumpNewTokenResponse } from '@/types/services';
 import { ipfsToHttp, LRU } from '@/lib/utils/ipfs';
 import { fetchJsonWithFallback } from '@/lib/utils';
+import type { Token } from '@/types/token';
 
 const metaCache = new LRU<string, any>(300);
 
 export function usePumpNewTokens() {
-    const [tokens, setTokens] = useState<PumpNewTokenEvent[]>([]);
-    const [connected, setConnected] = useState(false);
+    const [tokens, setTokens] = useState<Token[]>([]);
+    const [enteredTokens, setEnteredTokens] = useState<Token[]>([]);
+    const prevDataRef = useRef<{ tokens: Map<string, Token>; enteredTokens: Map<string, Token> }>({
+        tokens: new Map(),
+        enteredTokens: new Map(),
+    });
     const wsRef = useRef<WebSocket | null>(null);
 
     useEffect(() => {
-        const ws = new WebSocket('wss://pumpportal.fun/api/data');
+        const ws = new WebSocket('ws://localhost:4000');
         wsRef.current = ws;
 
-        ws.onopen = () => {
-            setConnected(true);
-            ws.send(JSON.stringify({ method: 'subscribeNewToken' }));
-        };
-
-        ws.onmessage = async (ev) => {
-            let msg: any;
-            try {
-                msg = JSON.parse(ev.data);
-            } catch {
-                return;
-            }
-
-            // Expecting new token events matching your shape
-            const e = msg as Partial<PumpNewTokenEvent>;
-            if (!e || e.txType !== 'create' || !e.mint) return;
-
-            // resolve image (from metadata at e.uri)
-            let imageUrl: string | undefined;
-            if (e.uri) {
-                const cached = metaCache.get(e.uri);
-                try {
-                    const meta = cached ?? (await fetchJsonWithFallback(ipfsToHttp(e.uri)));
-                    if (!cached) metaCache.set(e.uri, meta);
-
-                    const rawImage = meta?.image ?? meta?.image_url ?? meta?.icon;
-                    if (rawImage) {
-                        imageUrl = ipfsToHttp(String(rawImage))[0]; // pick first gateway
+        ws.onmessage = async (event) => {
+            const data = JSON.parse(event.data) as PumpNewTokenResponse;
+            const processTokens = async (tokenList: Token[], prevMap: Map<string, Token>): Promise<Token[]> => {
+                const tokensWithImages: Token[] = [];
+                for (const token of tokenList) {
+                    let imageUrl: string | undefined;
+                    if (token.uri) {
+                        const cached = metaCache.get(token.uri);
+                        try {
+                            const meta = cached ?? (await fetchJsonWithFallback(ipfsToHttp(token.uri)));
+                            if (!cached) metaCache.set(token.uri, meta);
+                            const rawImage = meta?.image ?? meta?.image_url ?? meta?.icon;
+                            if (rawImage) imageUrl = ipfsToHttp(String(rawImage))[0];
+                        } catch {}
                     }
-                } catch {
-                    // ignore meta failures
+                    const prevToken = prevMap.get(token.mint);
+                    tokensWithImages.push({ ...token, image: imageUrl, previous: prevToken });
                 }
-            }
-
-            const full: PumpNewTokenEvent = {
-                signature: e.signature!,
-                mint: e.mint!,
-                traderPublicKey: e.traderPublicKey ?? '',
-                txType: 'create',
-                initialBuy: Number(e.initialBuy ?? 0),
-                solAmount: Number(e.solAmount ?? 0),
-                bondingCurveKey: e.bondingCurveKey ?? '',
-                vTokensInBondingCurve: Number(e.vTokensInBondingCurve ?? 0),
-                vSolInBondingCurve: Number(e.vSolInBondingCurve ?? 0),
-                marketCapSol: Number(e.marketCapSol ?? 0),
-                name: e.name ?? 'Unknown',
-                symbol: e.symbol ?? '',
-                uri: e.uri ?? '',
-                pool: e.pool ?? '',
-                timestamp: e.timestamp ?? Date.now(),
-                image: imageUrl,
+                return tokensWithImages;
             };
 
-            setTokens((prev) => [full, ...prev].slice(0, 200));
+            const newActiveTokens = await processTokens(data.activeTokens, prevDataRef.current.tokens);
+            const newEnteredTokens = await processTokens(data.enteredTokens, prevDataRef.current.enteredTokens);
+
+            setTokens(newActiveTokens);
+            setEnteredTokens(newEnteredTokens);
+
+            prevDataRef.current = {
+                tokens: new Map(data.activeTokens.map((t) => [t.mint, t])),
+                enteredTokens: new Map(data.enteredTokens.map((t) => [t.mint, t])),
+            };
         };
 
-        ws.onclose = () => setConnected(false);
-        ws.onerror = () => setConnected(false);
+        // const interval = setInterval(async () => {
+        //     fetch('http://localhost:4000/tokens')
+        //         .then((res) => res.json())
+        //         .then(async (data: PumpNewTokenResponse) => {
+        //             const processTokens = async (tokenList: Token[], prevMap: Map<string, Token>): Promise<Token[]> => {
+        //                 const tokensWithImages: Token[] = [];
+        //                 for (const token of tokenList) {
+        //                     let imageUrl: string | undefined;
+        //                     if (token.uri) {
+        //                         const cached = metaCache.get(token.uri);
+        //                         try {
+        //                             const meta = cached ?? (await fetchJsonWithFallback(ipfsToHttp(token.uri)));
+        //                             if (!cached) metaCache.set(token.uri, meta);
+        //                             const rawImage = meta?.image ?? meta?.image_url ?? meta?.icon;
+        //                             if (rawImage) imageUrl = ipfsToHttp(String(rawImage))[0];
+        //                         } catch {}
+        //                     }
+        //                     const prevToken = prevMap.get(token.mint);
+        //                     tokensWithImages.push({ ...token, image: imageUrl, previous: prevToken });
+        //                 }
+        //                 return tokensWithImages;
+        //             };
 
-        return () => ws.close();
+        //             const newActiveTokens = await processTokens(data.activeTokens, prevDataRef.current.tokens);
+        //             const newEnteredTokens = await processTokens(data.enteredTokens, prevDataRef.current.enteredTokens);
+
+        //             setTokens(newActiveTokens);
+        //             setEnteredTokens(newEnteredTokens);
+
+        //             prevDataRef.current = {
+        //                 tokens: new Map(data.activeTokens.map((t) => [t.mint, t])),
+        //                 enteredTokens: new Map(data.enteredTokens.map((t) => [t.mint, t])),
+        //             };
+        //         });
+        // }, 5000);
+
+        return () => {
+            // clearInterval(interval);
+            wsRef.current?.close();
+        };
     }, []);
 
-    return { tokens, connected };
+    return { tokens, enteredTokens };
 }
