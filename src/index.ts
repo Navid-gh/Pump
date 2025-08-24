@@ -304,6 +304,12 @@ function subscribeToNewToken() {
     // }, WS_CONFIG.newTokenTimeout);
 }
 
+function unsubscribeFromNewToken() {
+    if (!WS_CONFIG.listenNewToken) return;
+    ws.send(JSON.stringify({ method: 'unsubscribeNewToken' }));
+    console.log('Unsubscribed from new tokens');
+}
+
 function subscribeToTokenTrades() {
     if (!WS_CONFIG.listenTokenTrade) return;
     if (WS_CONFIG.tokens.length === 0) {
@@ -319,6 +325,12 @@ function subscribeToTokenTrades() {
     ws.send(JSON.stringify(payload));
     console.log('Subscribed to token trades:', WS_CONFIG.tokens.map((t) => t.name).join(', '));
     // Check trades periodically
+}
+
+function unsubscribeFromTokenTrades() {
+    if (!WS_CONFIG.listenTokenTrade) return;
+    ws.send(JSON.stringify({ method: 'unsubscribeTokenTrade' }));
+    console.log('Unsubscribed from token trades');
 }
 
 async function checkAndCleanTokens() {
@@ -555,6 +567,17 @@ app.post('/tokens/filter', (req: Request, res: Response) => {
     WS_CONFIG.tradeCheckInterval = tradeCheckInterval;
     WS_CONFIG.listenNewToken = listenNewToken;
     WS_CONFIG.listenTokenTrade = listenTokenTrade;
+
+    if (!listenNewToken) {
+        unsubscribeFromNewToken();
+    } else {
+        subscribeToNewToken();
+    }
+    if (!listenTokenTrade) {
+        unsubscribeFromTokenTrades();
+    } else {
+        subscribeToTokenTrades();
+    }
 
     res.json({ status: 'success' });
 });
