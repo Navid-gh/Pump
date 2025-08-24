@@ -571,6 +571,13 @@ app.post('/restart', async (req: Request, res: Response) => {
     res.json({ status: 'success' });
 });
 
+app.get('/healthz', (_, res) =>
+    res.json({
+        ok: true,
+        ts: Date.now(),
+    })
+);
+
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 
