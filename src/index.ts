@@ -493,6 +493,7 @@ async function main() {
 
     ws.on('close', function close() {
         console.log('Disconnected from WebSocket server');
+        main();
         clearInterval(tradeCheckInterval);
     });
 }
@@ -545,18 +546,23 @@ app.get('/tokens/filter', (req: Request, res: Response) => {
 });
 
 app.post('/tokens/filter', (req: Request, res: Response) => {
-    const { minMarketCap, newTokenTimeout, tradeCheckInterval } = req.body;
+    const { minMarketCap, minEntryMarketCap, minEntryTradesCount, newTokenTimeout, tradeCheckInterval, listenNewToken, listenTokenTrade } =
+        req.body;
     WS_CONFIG.minMarketCap = minMarketCap;
+    WS_CONFIG.minEntryMarketCap = minEntryMarketCap;
+    WS_CONFIG.minEntryTradesCount = minEntryTradesCount;
     WS_CONFIG.newTokenTimeout = newTokenTimeout;
     WS_CONFIG.tradeCheckInterval = tradeCheckInterval;
+    WS_CONFIG.listenNewToken = listenNewToken;
+    WS_CONFIG.listenTokenTrade = listenTokenTrade;
 
     res.json({ status: 'success' });
 });
 
-app.delete('/tokens/:mint', (req: Request, res: Response) => {
-    const { mint } = req.params;
-    WS_CONFIG.tokens = WS_CONFIG.tokens.filter((t) => t.mint !== mint);
-    WS_CONFIG.enteredTokens = WS_CONFIG.enteredTokens.filter((t) => t.mint !== mint);
+app.delete('/tokens', (req: Request, res: Response) => {
+    const { mints } = req.body;
+    WS_CONFIG.tokens = WS_CONFIG.tokens.filter((t) => !mints.includes(t.mint));
+    WS_CONFIG.enteredTokens = WS_CONFIG.enteredTokens.filter((t) => !mints.includes(t.mint));
     subscribeToTokenTrades();
     broadcastToClients();
     res.json({ status: 'success' });
