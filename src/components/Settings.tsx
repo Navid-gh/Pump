@@ -5,8 +5,8 @@ import { BACKEND_URL } from '@/lib/utils/constants';
 
 interface SettingsFormData {
     minMarketCap: number;
-    minEntryPointMC: number;
-    minEntryPointTradeCount: number;
+    minEntryMarketCap: number;
+    minEntryTradesCount: number;
     newTokenTimeout: number;
     tradeCheckInterval: number;
     listenNewToken: boolean;
@@ -29,8 +29,8 @@ const Settings: FC<SettingsProps> = ({ isOpen, onClose }) => {
             const data = (await settings.json()) as PumpNewTokenResponse['config'];
             reset({
                 minMarketCap: data.minMarketCap,
-                minEntryPointMC: data.minEntryMarketCap,
-                minEntryPointTradeCount: data.minEntryTradesCount,
+                minEntryMarketCap: data.minEntryMarketCap,
+                minEntryTradesCount: data.minEntryTradesCount,
                 newTokenTimeout: data.newTokenTimeout,
                 tradeCheckInterval: data.tradeCheckInterval,
                 listenNewToken: data.listenNewToken,
@@ -47,8 +47,8 @@ const Settings: FC<SettingsProps> = ({ isOpen, onClose }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     minMarketCap: Number(data.minMarketCap),
-                    minEntryPointMC: Number(data.minEntryPointMC),
-                    minEntryPointTradeCount: Number(data.minEntryPointTradeCount),
+                    minEntryMarketCap: Number(data.minEntryMarketCap),
+                    minEntryTradesCount: Number(data.minEntryTradesCount),
                     newTokenTimeout: Number(data.newTokenTimeout),
                     tradeCheckInterval: Number(data.tradeCheckInterval),
                     listenNewToken: data.listenNewToken,
@@ -80,24 +80,24 @@ const Settings: FC<SettingsProps> = ({ isOpen, onClose }) => {
                         />
                     </div>
                     <div>
-                        <label htmlFor='minEntryPointMC' className='block text-sm font-medium text-white/80'>
+                        <label htmlFor='minEntryMarketCap' className='block text-sm font-medium text-white/80'>
                             Min Entry Point MC (SOL)
                         </label>
                         <input
                             type='number'
-                            id='minEntryPointMC'
-                            {...register('minEntryPointMC')}
+                            id='minEntryMarketCap'
+                            {...register('minEntryMarketCap')}
                             className='w-full bg-white/5 rounded-md p-2 mt-1'
                         />
                     </div>
                     <div>
-                        <label htmlFor='minEntryPointTradeCount' className='block text-sm font-medium text-white/80'>
+                        <label htmlFor='minEntryTradesCount' className='block text-sm font-medium text-white/80'>
                             Min Entry Point Trade Count
                         </label>
                         <input
                             type='number'
-                            id='minEntryPointTradeCount'
-                            {...register('minEntryPointTradeCount')}
+                            id='minEntryTradesCount'
+                            {...register('minEntryTradesCount')}
                             className='w-full bg-white/5 rounded-md p-2 mt-1'
                         />
                     </div>

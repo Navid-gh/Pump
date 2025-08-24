@@ -6,7 +6,13 @@ import { useFavorites } from '@/hooks/useFavorites';
 import { formatTime, solToUsd, formatPercentage } from '@/lib/utils/format';
 import { BACKEND_URL } from '@/lib/utils/constants';
 
-export default function TokenCard({ t }: { t: Token }) {
+interface TokenCardProps {
+    t: Token;
+    isSelected?: boolean;
+    onSelect?: (selected: boolean) => void;
+}
+
+export default function TokenCard({ t, isSelected = false, onSelect }: TokenCardProps) {
     const [copied, setCopied] = useState(false);
     const { addFavorite, removeFavorite, isFavorite } = useFavorites();
     const isFav = isFavorite(t.mint);
@@ -54,8 +60,19 @@ export default function TokenCard({ t }: { t: Token }) {
     const lastTrade = t?.trades?.all?.[t?.trades?.all?.length - 1];
 
     return (
-        <div className='rounded-2xl bg-white/5 ring-1 ring-white/10 p-4 shadow-lg backdrop-blur text-[12px]'>
+        <div
+            className={`rounded-2xl p-4 shadow-lg backdrop-blur text-[12px] transition-all duration-200 ${
+                isSelected ? 'bg-blue-500/10 ring-2 ring-blue-500/50' : 'bg-white/5 ring-1 ring-white/10'
+            }`}>
             <div className='flex items-center gap-3'>
+                {onSelect && (
+                    <input
+                        type='checkbox'
+                        checked={isSelected}
+                        onChange={(e) => onSelect(e.target.checked)}
+                        className='w-4 h-4 text-blue-600 bg-white/5 border-gray-300 rounded focus:ring-blue-500'
+                    />
+                )}
                 {t.image ? (
                     <img src={t.image} alt={t.name} className='w-10 h-10 rounded-xl object-cover' />
                 ) : (

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PumpNewTokenResponse } from '@/types/services';
-import { ipfsToHttp, LRU } from '@/lib/utils/ipfs';
-import { fetchJsonWithFallback } from '@/lib/utils';
 import type { Token } from '@/types/token';
 import { BACKEND_URL } from '@/lib/utils/constants';
 
-const metaCache = new LRU<string, any>(300);
+// import { ipfsToHttp, LRU } from '@/lib/utils/ipfs';
+// import { fetchJsonWithFallback } from '@/lib/utils';
+// const metaCache = new LRU<string, any>(300);
 
 export function usePumpNewTokens() {
     const [tokens, setTokens] = useState<Token[]>([]);
@@ -25,16 +25,16 @@ export function usePumpNewTokens() {
                     const processTokens = async (tokenList: Token[], prevMap: Map<string, Token>): Promise<Token[]> => {
                         const tokensWithImages: Token[] = [];
                         for (const token of tokenList) {
-                            let imageUrl: string | undefined;
-                            if (token.uri) {
-                                const cached = metaCache.get(token.uri);
-                                try {
-                                    const meta = cached ?? (await fetchJsonWithFallback(ipfsToHttp(token.uri)));
-                                    if (!cached) metaCache.set(token.uri, meta);
-                                    const rawImage = meta?.image ?? meta?.image_url ?? meta?.icon;
-                                    if (rawImage) imageUrl = ipfsToHttp(String(rawImage))[0];
-                                } catch {}
-                            }
+                            let imageUrl: string | undefined = '';
+                            // if (token.uri) {
+                            //     const cached = metaCache.get(token.uri);
+                            //     try {
+                            //         const meta = cached ?? (await fetchJsonWithFallback(ipfsToHttp(token.uri)));
+                            //         if (!cached) metaCache.set(token.uri, meta);
+                            //         const rawImage = meta?.image ?? meta?.image_url ?? meta?.icon;
+                            //         if (rawImage) imageUrl = ipfsToHttp(String(rawImage))[0];
+                            //     } catch {}
+                            // }
                             const prevToken = prevMap.get(token.mint);
                             tokensWithImages.push({ ...token, image: imageUrl, previous: prevToken });
                         }
