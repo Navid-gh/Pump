@@ -26,7 +26,7 @@ export function usePumpNewTokens() {
                         const tokensWithImages: Token[] = [];
                         for (const token of tokenList) {
                             let imageUrl: string | undefined = '';
-                            // if (token.uri) {
+                            // if (token.uri && isMounted) {
                             //     const cached = metaCache.get(token.uri);
                             //     try {
                             //         const meta = cached ?? (await fetchJsonWithFallback(ipfsToHttp(token.uri)));
