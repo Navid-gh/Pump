@@ -140,14 +140,14 @@ export default function Dashboard() {
                     className={`pb-2 text-sm transition-colors ${
                         activeTab === 'new' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'
                     }`}>
-                    New Tokens ({tokens.length})
+                    New Active Tokens ({tokens.length})
                 </button>
                 <button
                     onClick={() => handleTabClick('entered')}
                     className={`pb-2 text-sm transition-colors ${
                         activeTab === 'entered' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'
                     }`}>
-                    Entered Tokens ({enteredTokens.length})
+                    Entered Active Tokens ({enteredTokens.length})
                 </button>
                 <button
                     onClick={() => handleTabClick('favorites')}

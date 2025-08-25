@@ -63,7 +63,7 @@ export default function TokenCard({ t, isSelected = false, onSelect }: TokenCard
     // Calculate the difference between max market cap time and entry point time, and format it
     const maxMCTimeDiff = isEntered
         ? t?.marketCap?.max?.timestamp && t?.entryPoint?.timestamp
-            ? formatTime((t.marketCap.max.timestamp - t.entryPoint.timestamp) / 1000)
+            ? formatTime((t.marketCap.max.timestamp - t.entryPoint.timestamp) / 1000) + ' diff from entry'
             : ''
         : t?.marketCap?.max?.timestamp
         ? formatTime((Date.now() - t.marketCap.max.timestamp) / 1000)
