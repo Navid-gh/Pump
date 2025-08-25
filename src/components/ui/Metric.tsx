@@ -8,10 +8,20 @@ interface MetricProps {
     className?: string;
     format?: boolean;
     time?: number;
+    mustFormatTime?: boolean;
     prefix?: string;
 }
 
-export const Metric: FC<MetricProps> = ({ label, value, previousValue, className, format = true, time, prefix = '' }) => {
+export const Metric: FC<MetricProps> = ({
+    label,
+    value,
+    previousValue,
+    className,
+    format = true,
+    time,
+    mustFormatTime = true,
+    prefix = '',
+}) => {
     let valueStr: string;
     let colorClass = 'text-white/90';
     let icon = null;
@@ -39,7 +49,11 @@ export const Metric: FC<MetricProps> = ({ label, value, previousValue, className
                     {icon} {prefix} {valueStr}
                 </span>
             </div>
-            {time && <div className='text-xs text-white/50 text-right'>{formatTime((Date.now() - time) / 1000)} ago</div>}
+            {time && (
+                <div className='text-xs text-white/50 text-right'>
+                    {mustFormatTime ? formatTime((Date.now() - time) / 1000) + ' ago' : time}
+                </div>
+            )}
         </div>
     );
 };

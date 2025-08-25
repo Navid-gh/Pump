@@ -40,7 +40,7 @@ export default function Dashboard() {
                 break;
         }
         // Sort by last trade time (most recent first)
-        return result.sort((a, b) => b.lastTradeTime - a.lastTradeTime);
+        return result.sort((a, b) => b.timestamp - a.timestamp);
     }, [activeTab, tokens, enteredTokens, favoriteTokens]);
 
     // Memoize selection state

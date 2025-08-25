@@ -58,6 +58,17 @@ export default function TokenCard({ t, isSelected = false, onSelect }: TokenCard
     if (isDeleted) return null;
 
     const lastTrade = t?.trades?.all?.[t?.trades?.all?.length - 1];
+    const profit = (t?.marketCap?.max?.marketCapSol ?? 0) - (t?.entryPoint?.marketCapSol ?? 0);
+    const isEntered = (t?.entryPoint?.marketCapSol ?? 0) > 0;
+    // Calculate the difference between max market cap time and entry point time, and format it
+    const maxMCTimeDiff = isEntered
+        ? t?.marketCap?.max?.timestamp && t?.entryPoint?.timestamp
+            ? formatTime((t.marketCap.max.timestamp - t.entryPoint.timestamp) / 1000)
+            : ''
+        : t?.marketCap?.max?.timestamp
+        ? formatTime((Date.now() - t.marketCap.max.timestamp) / 1000)
+        : '';
+    const enteredPointTime = isEntered && t?.entryPoint?.timestamp ? new Date(t.entryPoint.timestamp).toLocaleString() : '';
 
     return (
         <div
@@ -120,7 +131,8 @@ export default function TokenCard({ t, isSelected = false, onSelect }: TokenCard
                     label='MCmax'
                     value={solToUsd(t?.marketCap?.max?.marketCapSol ?? 0)}
                     previousValue={t?.previous ? solToUsd(t?.previous?.marketCap?.max?.marketCapSol ?? 0) : undefined}
-                    time={t?.marketCap?.max?.timestamp}
+                    time={maxMCTimeDiff as any}
+                    mustFormatTime={false}
                     prefix='$'
                 />
                 <Metric
@@ -195,12 +207,8 @@ export default function TokenCard({ t, isSelected = false, onSelect }: TokenCard
                         prefix='$'
                         time={t?.entryPoint?.timestamp}
                     />
-                    <Metric
-                        label='Profit'
-                        value={formatPercentage(t?.marketCap?.max?.marketCapSol ?? 0, t?.entryPoint?.marketCapSol ?? 0)}
-                        format={false}
-                    />
-                    <Metric label='Time' value={formatTime((Date.now() - t?.entryPoint?.timestamp) / 1000)} format={false} />
+                    <Metric label='Profit' value={formatPercentage(profit, t?.entryPoint?.marketCapSol ?? 0)} format={false} />
+                    <Metric label='Time' value={enteredPointTime} format={false} />
                 </div>
             )}
 
