@@ -6,14 +6,23 @@ import errorMiddleware from './middlewares/error.js';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs/promises';
+import fsSync from 'fs';
 
 const app: Express = express();
 const server = http.createServer(app);
-// Create WebSocket server for clients
 // const clientsWs = new WebSocketServer({ server });
 const port = process.env.PORT || 4000;
-// Add file path constant
-const ENTERED_TOKENS_FILE = path.join(process.cwd(), 'entered_tokens.json');
+const DATA_DIR = process.env.DATA_DIR || process.cwd();
+// Only create directory if it's not the current working directory (for Docker)
+if (DATA_DIR !== process.cwd()) {
+    try {
+        fsSync.mkdirSync(DATA_DIR, { recursive: true });
+        console.log('Created data directory:', DATA_DIR);
+    } catch (error) {
+        console.warn('Could not create data directory, using current directory:', error);
+    }
+}
+const ENTERED_TOKENS_FILE = path.join(DATA_DIR, 'entered_tokens.json');
 
 interface NewTokenData {
     signature: string;
@@ -115,15 +124,21 @@ const WS_CONFIG = {
     newTokenTimeout: 60000, // 1 minute
     tradeCheckInterval: 60000, // 1 minute
 
+    enteredTokensCap: 50,
+    enteredTokensSavingBatchSize: 30,
+
     listenNewToken: true,
     listenTokenTrade: true,
 };
 
+// Add a flag to prevent auto-reconnection during manual restart
+let isManualRestart = false;
+
 function responseFormat() {
     return {
         status: 'running',
-        activeTokens: WS_CONFIG.tokens.map(serializeToken),
-        enteredTokens: WS_CONFIG.enteredTokens.map(serializeToken),
+        activeTokens: WS_CONFIG.tokens,
+        enteredTokens: WS_CONFIG.enteredTokens,
         config: {
             minMarketCap: WS_CONFIG.minMarketCap,
             minEntryMarketCap: WS_CONFIG.minEntryMarketCap,
@@ -136,15 +151,46 @@ function responseFormat() {
     };
 }
 
-// Function to save entered tokens
-async function saveEnteredTokens() {
+// Function to append entered tokens to file
+async function saveEnteredTokens(tokens: Token[] = WS_CONFIG.enteredTokens) {
     try {
-        const serializedTokens = WS_CONFIG.enteredTokens.map(serializeToken);
+        console.log('Saving removed entered tokens to file');
+        let existingTokens: Token[] = [];
+        try {
+            const data = await fs.readFile(ENTERED_TOKENS_FILE, 'utf-8');
+            existingTokens = JSON.parse(data);
+            if (!Array.isArray(existingTokens)) existingTokens = [];
+        } catch (err) {
+            // File does not exist or is invalid, start with empty array
+            existingTokens = [];
+        }
 
-        await fs.writeFile(ENTERED_TOKENS_FILE, JSON.stringify(serializedTokens, null, 2));
-        console.log('Saved entered tokens to file');
+        // Append only new tokens that are not already present (by some unique property, e.g., address)
+        const existingAddresses = new Set(existingTokens.map((t) => t.mint));
+        const newTokens = tokens.filter((t) => !existingAddresses.has(t.mint));
+        const updatedTokens = existingTokens.concat(newTokens);
+
+        await fs.writeFile(ENTERED_TOKENS_FILE, JSON.stringify(updatedTokens, null, 2));
+        console.log('Appended entered tokens to file');
     } catch (error) {
-        console.error('Error saving entered tokens:', error);
+        console.error('Error appending entered tokens:', error);
+    }
+}
+
+// Function to check if the entered tokens are more than 50, if yes save them to file
+async function checkAndSaveEnteredTokens() {
+    if (WS_CONFIG.enteredTokens.length > WS_CONFIG.enteredTokensCap) {
+        // Find the oldest 30 tokens in enteredTokens that are NOT in tokens array
+        const currentTokenMints = new Set(WS_CONFIG.tokens.map((t) => t.mint));
+        const removableTokens = WS_CONFIG.enteredTokens
+            .filter((t) => !currentTokenMints.has(t.mint))
+            .slice(0, WS_CONFIG.enteredTokensSavingBatchSize);
+        // Remove them from enteredTokens
+        WS_CONFIG.enteredTokens = WS_CONFIG.enteredTokens.filter((t) => !removableTokens.includes(t));
+        // Save the removed tokens to file
+        if (removableTokens.length > 0) {
+            saveEnteredTokens(removableTokens);
+        }
     }
 }
 
@@ -208,6 +254,8 @@ const checkForEntryPoint = (token: Token, currentTrade: TokenTradeData) => {
                 timestamp: Date.now(),
             };
             WS_CONFIG.enteredTokens.push(token);
+            // Check for the cap of entered tokens
+            checkAndSaveEnteredTokens();
         }
     }
 };
@@ -296,12 +344,6 @@ function subscribeToNewToken() {
     };
     ws.send(JSON.stringify(payload));
     console.log('Subscribed to new tokens');
-    // // Unsubscribe after 1 minute
-    // setTimeout(() => {
-    //     ws.send(JSON.stringify({ method: 'unsubscribeNewToken' }));
-    //     console.log('Unsubscribed from new tokens');
-    //     subscribeToTokenTrades();
-    // }, WS_CONFIG.newTokenTimeout);
 }
 
 function unsubscribeFromNewToken() {
@@ -345,12 +387,6 @@ async function checkAndCleanTokens() {
         const removedTokens = oldTokens.filter((t) => !WS_CONFIG.tokens.includes(t));
         console.log('Removed inactive tokens:', removedTokens.map((t) => t.name).join(', '));
 
-        // Check if the removed tokens are in the enteredTokens
-        const removedEnteredTokens = removedTokens.filter((t) => t?.entryPoint?.marketCapSol);
-        if (removedEnteredTokens.length > 0) {
-            await saveEnteredTokens();
-        }
-
         // Broadcast tokens update
         broadcastToClients();
 
@@ -360,8 +396,7 @@ async function checkAndCleanTokens() {
 }
 
 async function main() {
-    const enteredTokens = await loadEnteredTokens();
-    WS_CONFIG.enteredTokens = enteredTokens;
+    WS_CONFIG.enteredTokens = [];
     WS_CONFIG.tokens = [];
     if (ws && ws.readyState === WebSocket.OPEN) {
         ws.close();
@@ -487,11 +522,11 @@ async function main() {
                 // Calculate volume
                 getTotalVolume(token);
 
-                // Logging
-                const tradeType = parsedData.txType === 'buy' ? '🟢 BUY' : '🔴 SELL';
-                const timeStr = new Date(Date.now()).toLocaleTimeString();
-                const marketCapStr = tradeData.marketCapSol ? `${tradeData.marketCapSol} SOL` : 'N/A';
-                console.log(`[${timeStr}] ${tradeType} | ${token.name} (${token.mint})\n` + `   Market Cap: ${marketCapStr}`);
+                // // Logging
+                // const tradeType = parsedData.txType === 'buy' ? '🟢 BUY' : '🔴 SELL';
+                // const timeStr = new Date(Date.now()).toLocaleTimeString();
+                // const marketCapStr = tradeData.marketCapSol ? `${tradeData.marketCapSol} SOL` : 'N/A';
+                // console.log(`[${timeStr}] ${tradeType} | ${token.name} (${token.mint})\n` + `   Market Cap: ${marketCapStr}`);
 
                 // Broadcast trade
                 broadcastToClients();
@@ -505,21 +540,17 @@ async function main() {
 
     ws.on('close', function close() {
         console.log('Disconnected from WebSocket server');
-        main();
         clearInterval(tradeCheckInterval);
-    });
-}
 
-function serializeToken(token: Token) {
-    return {
-        ...token,
-        traders: {
-            higher1SolBuyers: token.traders.higher1SolBuyers,
-            higher1SolSellers: token.traders.higher1SolSellers,
-            buyers: token.traders.buyers,
-            sellers: token.traders.sellers,
-        },
-    };
+        // Only auto-reconnect if it's not a manual restart
+        if (!isManualRestart) {
+            console.log('Auto-reconnecting to pump server...');
+            setTimeout(() => main(), 5000); // Wait 5 seconds before reconnecting
+        } else {
+            console.log('Manual restart detected, not auto-reconnecting');
+            isManualRestart = false; // Reset the flag
+        }
+    });
 }
 
 // Express setup
@@ -593,6 +624,7 @@ app.delete('/tokens', (req: Request, res: Response) => {
 
 app.post('/restart', async (req: Request, res: Response) => {
     await saveEnteredTokens();
+    isManualRestart = true; // Set flag before restart
     main().catch((err) => {
         console.error('Error starting server:', err);
         process.exit(1);

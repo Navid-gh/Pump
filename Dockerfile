@@ -16,5 +16,6 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile --prod
 COPY --from=build /app/dist ./dist
 EXPOSE 3000
-HEALTHCHECK --interval=20s --timeout=2s --retries=3 CMD curl -fsS http://127.0.0.1:3000/healthz || exit 1
+RUN apk add --no-cache curl
+HEALTHCHECK --interval=60s --timeout=2s --retries=3 CMD curl -fsS http://127.0.0.1:3000/healthz || exit 1
 CMD ["node","dist/index.js"]
