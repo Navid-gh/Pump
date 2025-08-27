@@ -154,24 +154,11 @@ function responseFormat() {
 // Function to append entered tokens to file
 async function saveEnteredTokens(tokens: Token[] = WS_CONFIG.enteredTokens) {
     try {
-        console.log('Saving removed entered tokens to file');
-        let existingTokens: Token[] = [];
-        try {
-            const data = await fs.readFile(ENTERED_TOKENS_FILE, 'utf-8');
-            existingTokens = JSON.parse(data);
-            if (!Array.isArray(existingTokens)) existingTokens = [];
-        } catch (err) {
-            // File does not exist or is invalid, start with empty array
-            existingTokens = [];
-        }
-
-        // Append only new tokens that are not already present (by some unique property, e.g., address)
-        const existingAddresses = new Set(existingTokens.map((t) => t.mint));
-        const newTokens = tokens.filter((t) => !existingAddresses.has(t.mint));
-        const updatedTokens = existingTokens.concat(newTokens);
-
-        await fs.writeFile(ENTERED_TOKENS_FILE, JSON.stringify(updatedTokens, null, 2));
-        console.log('Appended entered tokens to file');
+        // Save tokens to a file named with the current timestamp to avoid loading the whole file each time
+        const timestamp = Date.now();
+        const timeFile = `entered_tokens_${timestamp}.json`;
+        await fs.writeFile(timeFile, JSON.stringify(tokens, null, 2));
+        console.log(`Saved entered tokens to file: ${timeFile}`);
     } catch (error) {
         console.error('Error appending entered tokens:', error);
     }
@@ -334,11 +321,11 @@ const calculateMarketCapMetrics = (token: Token, latestTrade: TokenTradeData) =>
 };
 
 // WebSocket client setup for pumpportal
-let ws: WebSocket;
-let tradeCheckInterval: NodeJS.Timeout;
+let ws: WebSocket | null = null;
+let tradeCheckInterval: NodeJS.Timeout | null = null;
 
 function subscribeToNewToken() {
-    if (!WS_CONFIG.listenNewToken) return;
+    if (!WS_CONFIG.listenNewToken || !ws) return;
     const payload = {
         method: 'subscribeNewToken',
     };
@@ -347,13 +334,13 @@ function subscribeToNewToken() {
 }
 
 function unsubscribeFromNewToken() {
-    if (!WS_CONFIG.listenNewToken) return;
+    if (!WS_CONFIG.listenNewToken || !ws) return;
     ws.send(JSON.stringify({ method: 'unsubscribeNewToken' }));
     console.log('Unsubscribed from new tokens');
 }
 
 function subscribeToTokenTrades() {
-    if (!WS_CONFIG.listenTokenTrade) return;
+    if (!WS_CONFIG.listenTokenTrade || !ws) return;
     if (WS_CONFIG.tokens.length === 0) {
         console.log('No tokens to watch');
         subscribeToNewToken();
@@ -370,7 +357,7 @@ function subscribeToTokenTrades() {
 }
 
 function unsubscribeFromTokenTrades() {
-    if (!WS_CONFIG.listenTokenTrade) return;
+    if (!WS_CONFIG.listenTokenTrade || !ws) return;
     ws.send(JSON.stringify({ method: 'unsubscribeTokenTrade' }));
     console.log('Unsubscribed from token trades');
 }
@@ -396,11 +383,27 @@ async function checkAndCleanTokens() {
 }
 
 async function main() {
+    // Clean up existing resources first to prevent memory leaks
+    if (ws) {
+        // Remove all event listeners to prevent memory leaks
+        ws.removeAllListeners();
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.close();
+        }
+        ws = null;
+    }
+
+    // Clear existing intervals
+    if (tradeCheckInterval) {
+        clearInterval(tradeCheckInterval);
+        tradeCheckInterval = null;
+    }
+
+    // Load entered tokens from file
     WS_CONFIG.enteredTokens = [];
     WS_CONFIG.tokens = [];
-    if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.close();
-    }
+
+    // Create new WebSocket connection
     ws = new WebSocket(WS_CONFIG.url);
     ws.on('open', function open() {
         console.log('Connected to WebSocket server');
@@ -540,7 +543,10 @@ async function main() {
 
     ws.on('close', function close() {
         console.log('Disconnected from WebSocket server');
-        clearInterval(tradeCheckInterval);
+        if (tradeCheckInterval) {
+            clearInterval(tradeCheckInterval);
+            tradeCheckInterval = null;
+        }
 
         // Only auto-reconnect if it's not a manual restart
         if (!isManualRestart) {
